@@ -2,11 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>German-English Flashcards</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/128x128/1f1e9-1f1ea.png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        body { 
+            touch-action: manipulation; 
+            -webkit-user-select: none; 
+            user-select: none; 
+            -webkit-tap-highlight-color: transparent;
+        }
         .perspective-1000 { perspective: 1000px; }
         .transform-style-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
@@ -14,295 +24,594 @@
         .duration-600 { transition-duration: 600ms; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Hide backface elements to stop Safari double rendering issues */
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .card-back {
+            transform: rotateY(180deg);
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans h-screen flex flex-col antialiased relative">
-    <!-- Header -->
-    <header class="bg-white shadow-sm p-4 sticky top-0 z-20">
-        <div class="max-w-2xl mx-auto flex items-center justify-between mb-4">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <i data-lucide="languages"></i> German Flashcards
+<body class="bg-slate-50 text-slate-900 font-sans h-screen flex flex-col antialiased relative overflow-hidden">
+    
+    <!-- HEADER -->
+    <header class="bg-white shadow-sm p-4 z-20 flex-shrink-0">
+        <div class="max-w-xl mx-auto flex items-center justify-between">
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 cursor-pointer" onclick="UI.showView('landing')">
+                <i data-lucide="languages"></i> FC
             </h1>
-            <button id="settingsBtn" class="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors">
-                <i data-lucide="settings"></i>
-                <span class="sr-only">Settings</span>
-            </button>
-        </div>
-        <!-- Progress Bar -->
-        <div class="max-w-2xl mx-auto flex items-center gap-4">
-            <span class="text-sm font-medium w-12 text-right" id="progressText">0%</span>
-            <div class="flex-1 bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            <div id="headerStatus" class="text-xs font-medium px-2 py-1 rounded bg-slate-100 text-slate-500 hidden">
+                Mode
             </div>
         </div>
     </header>
 
-    <!-- Settings Panel -->
-    <div id="settingsPanel" class="hidden absolute top-20 right-4 md:right-auto md:left-1/2 md:-translate-x-1/2 bg-white shadow-xl rounded-xl p-6 border border-slate-100 z-30 w-80">
-        <h3 class="font-bold text-lg mb-4">Settings</h3>
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-slate-700 mb-1">CSV Data URL</label>
-            <input type="text" id="csvUrlInput" class="w-full text-sm p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Google Sheet published as CSV">
-            <p class="text-xs text-slate-500 mt-1">Leave blank to use sample dataset.</p>
-        </div>
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-slate-700 mb-1">Words per Section</label>
-            <input type="number" id="wpsInput" min="1" max="100" value="10" class="w-full text-sm p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none">
-        </div>
-        <button id="saveSettingsBtn" class="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition-colors">Apply & Reload</button>
-        <button id="resetDataBtn" class="w-full bg-slate-100 text-slate-700 py-2 rounded font-medium hover:bg-slate-200 transition-colors mt-2 text-sm">Reset Progress</button>
-    </div>
-
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-4 flex flex-col items-center">
-        <div id="messageBox" class="text-sm rounded p-3 mb-4 hidden max-w-2xl w-full text-center"></div>
-
-        <!-- Section Header -->
-        <div class="w-full max-w-[400px] flex justify-between items-center mb-6 mt-2">
-            <h2 id="sectionTitle" class="font-semibold text-lg text-slate-700">Section 1</h2>
-            <div class="flex items-center gap-2">
-                <input type="checkbox" id="sectionComplete" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
-                <label for="sectionComplete" class="text-sm font-medium text-slate-600 cursor-pointer select-none">Completed</label>
-            </div>
-        </div>
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 overflow-y-auto w-full max-w-xl mx-auto p-4 flex flex-col items-center">
         
-        <div class="w-full max-w-[400px] mb-2 text-center text-sm font-medium text-slate-500">
-            Card <span id="cardIndex">1/10</span>
+        <!-- GLOBAL MESSAGES -->
+        <div id="messageBox" class="text-sm rounded p-3 mb-4 hidden w-full text-center transition-opacity"></div>
+
+        <!-- 1. LANDING VIEW -->
+        <div id="view-landing" class="w-full h-full flex flex-col justify-center items-center gap-6 pb-20">
+            <div class="text-center mb-4">
+                <div class="text-6xl mb-4">🇩🇪</div>
+                <h2 class="text-2xl font-bold text-slate-800">Learn German</h2>
+                <p class="text-slate-500 text-sm mt-2">Choose your mode to begin.</p>
+            </div>
+            
+            <button onclick="App.startDemo()" class="w-full max-w-xs bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-4 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-3">
+                <i data-lucide="play" class="w-5 h-5"></i> Demo Mode
+                <span class="text-xs font-normal text-slate-500 block absolute mt-10">Public • Progress saved locally</span>
+            </button>
+            
+            <button onclick="UI.showView('login')" class="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-md transition-colors flex items-center justify-center gap-3 mt-4">
+                <i data-lucide="lock" class="w-5 h-5"></i> Admin Mode
+                <span class="text-xs font-normal text-blue-200 block absolute mt-10">Personal • Google Cloud Sync</span>
+            </button>
         </div>
 
-        <!-- Flashcard -->
-        <div class="w-[80%] max-w-[400px] aspect-[4/3] perspective-1000 cursor-pointer group mb-8 select-none" id="flashcard">
-            <div id="flashcardInner" class="relative w-full h-full duration-600 transform-style-3d shadow-lg rounded-2xl group-hover:shadow-xl transition-shadow">
-                <!-- Front (German) -->
-                <div class="absolute w-full h-full backface-hidden bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 text-center">
-                    <button class="audioBtn absolute top-4 right-4 p-3 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors z-10 focus:outline-none" aria-label="Play Audio">
-                        <i data-lucide="volume-2" class="w-6 h-6"></i>
-                    </button>
-                    <div class="text-sm font-medium text-slate-400 mb-2 uppercase tracking-wider">German</div>
-                    <div id="frontText" class="text-3xl md:text-4xl font-bold text-slate-800 break-words w-full px-4">Loading...</div>
-                    <div class="absolute bottom-4 text-xs text-slate-400 font-medium hidden md:block">Tap to flip • Space</div>
+        <!-- 2. LOGIN VIEW -->
+        <div id="view-login" class="w-full h-full flex flex-col justify-center items-center gap-4 pb-20 hidden">
+            <button onclick="UI.showView('landing')" class="self-start text-slate-500 hover:text-slate-800 mb-8 flex items-center gap-1">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+            </button>
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Admin Access</h2>
+            <p class="text-sm text-slate-500 mb-6 text-center">Enter your passcode to sync progress via Google Sheets.</p>
+            
+            <input type="password" id="passcodeInput" class="text-center text-2xl tracking-[0.5em] w-48 p-3 border-2 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all" placeholder="••••" maxlength="4" />
+            
+            <button onclick="App.verifyLogin()" class="w-48 bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md transition-colors mt-4">
+                Enter
+            </button>
+        </div>
+
+        <!-- 3. DASHBOARD VIEW -->
+        <div id="view-dashboard" class="w-full flex-col hidden pb-4">
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Sections</h2>
+                    <p class="text-sm text-slate-500" id="dashTotalWords">0 words total</p>
                 </div>
-                <!-- Back (English) -->
-                <div class="absolute w-full h-full backface-hidden bg-blue-50 border border-blue-100 rounded-2xl flex flex-col items-center justify-center p-6 text-center rotate-y-180">
-                    <button class="audioBtn absolute top-4 right-4 p-3 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors z-10 focus:outline-none" aria-label="Play Audio">
-                        <i data-lucide="volume-2" class="w-6 h-6"></i>
+                <button onclick="App.syncWithCloud()" id="syncBtn" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1 hidden">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Sync
+                </button>
+            </div>
+            
+            <!-- Overall Progress -->
+            <div class="mb-8">
+                <div class="flex justify-between text-sm font-medium mb-1">
+                    <span class="text-slate-600 text-xs uppercase tracking-wider">Overall Mastery</span>
+                    <span id="dashProgressPct" class="text-blue-600">0%</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                    <div id="dashProgressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div id="sectionsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <!-- Sections dynamically injected here -->
+            </div>
+        </div>
+
+        <!-- 4. FLASHCARD APP VIEW -->
+        <div id="view-flashcard" class="w-full max-w-[400px] flex-col hidden pb-4 h-full">
+            <!-- Header for Card View -->
+            <div class="flex justify-between items-center mb-6 mt-2">
+                <button onclick="UI.showView('dashboard')" class="p-2 -ml-2 text-slate-400 hover:text-slate-700 transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+                <div class="flex flex-col items-center">
+                    <h2 id="fcSectionTitle" class="font-semibold text-slate-700">Section 1</h2>
+                    <div class="text-xs font-medium text-slate-400">Card <span id="fcCardIndex">1/10</span></div>
+                </div>
+                <!-- Spacer for alignment -->
+                <div class="w-10"></div>
+            </div>
+
+            <!-- Flashcard 3D Wrapper -->
+            <div class="w-full aspect-[4/3] perspective-1000 cursor-pointer group mb-10 flex-shrink-0" id="flashcard" onclick="App.flipCard()">
+                <div id="flashcardInner" class="relative w-full h-full duration-600 transform-style-3d shadow-lg rounded-2xl">
+                    
+                    <!-- Front (German) -->
+                    <div class="card-face bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 text-center z-10">
+                        <button id="frontAudioBtn" class="absolute top-4 right-4 p-3 text-blue-500 hover:bg-blue-50 rounded-full z-20 disabled:opacity-50" onclick="App.playAudio(event, 'de')">
+                            <i data-lucide="volume-2" class="w-6 h-6"></i>
+                        </button>
+                        <div class="text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">German</div>
+                        <div id="fcFrontText" class="text-4xl font-bold text-slate-800 break-words w-full px-4">Loading...</div>
+                        <div class="absolute bottom-4 text-xs text-slate-400 font-medium">Tap to flip</div>
+                    </div>
+                    
+                    <!-- Back (English) -->
+                    <div class="card-face card-back bg-blue-50 border border-blue-100 rounded-2xl flex flex-col items-center justify-center p-6 text-center z-0">
+                        <button id="backAudioBtn" class="absolute top-4 right-4 p-3 text-blue-500 hover:bg-blue-100 rounded-full z-20 disabled:opacity-50" onclick="App.playAudio(event, 'en')">
+                            <i data-lucide="volume-2" class="w-6 h-6"></i>
+                        </button>
+                        <div class="text-xs font-medium text-blue-400 mb-2 uppercase tracking-wider">English</div>
+                        <div id="fcBackText" class="text-4xl font-bold text-slate-800 break-words w-full px-4">...</div>
+                        <div id="wordStatusIndicator" class="absolute bottom-16 text-sm font-bold opacity-0 transition-opacity"></div>
+                        <div class="absolute bottom-4 text-xs text-blue-400 font-medium opacity-70">Rate to continue</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Learning Controls (Only visibly active when flipped) -->
+            <div class="w-full flex justify-center gap-4 transition-opacity duration-300 opacity-50 pointer-events-none" id="learningControls">
+                <button onclick="App.rateCard('unlearned')" class="flex-1 bg-white border-2 border-red-200 hover:bg-red-50 text-red-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center gap-1 active:bg-red-100 focus:outline-none">
+                    <i data-lucide="x-circle" class="w-6 h-6"></i>
+                    <span>Unlearned</span>
+                </button>
+                <button onclick="App.rateCard('learned')" class="flex-1 bg-white border-2 border-green-200 hover:bg-green-50 text-green-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center gap-1 active:bg-green-100 focus:outline-none">
+                    <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                    <span>Learned</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 5. SUMMARY VIEW (Loop End) -->
+        <div id="view-summary" class="w-full h-full flex flex-col justify-center items-center gap-6 pb-20 hidden">
+            <div class="w-full p-6 bg-white rounded-2xl shadow-sm border border-slate-100 text-center">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="flag" class="w-8 h-8"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 mb-1">Section Complete!</h2>
+                <p class="text-sm text-slate-500 mb-6">Here is how you did on this round.</p>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-green-50 p-4 rounded-xl border border-green-100">
+                        <div class="text-3xl font-bold text-green-600 mb-1" id="sumLearned">0</div>
+                        <div class="text-xs font-semibold text-green-700 uppercase">Learned</div>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-xl border border-red-100">
+                        <div class="text-3xl font-bold text-red-600 mb-1" id="sumUnlearned">0</div>
+                        <div class="text-xs font-semibold text-red-700 uppercase">Unlearned</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button id="btnStartAgain" onclick="App.startLoop()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="rotate-ccw" class="w-5 h-5"></i> 
+                        <span id="btnStartAgainText">Start Again (0 words)</span>
                     </button>
-                    <div class="text-sm font-medium text-blue-400 mb-2 uppercase tracking-wider">English</div>
-                    <div id="backText" class="text-3xl md:text-4xl font-bold text-slate-800 break-words w-full px-4">...</div>
-                    <div class="absolute bottom-4 text-xs text-slate-400 font-medium hidden md:block">Tap to flip back • Space</div>
+                    <button onclick="App.finishSection()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="check" class="w-5 h-5"></i> Done & Exit
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="w-full max-w-[400px] flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-slate-100">
-            <button id="prevBtn" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                <i data-lucide="chevron-left" class="w-5 h-5"></i> <span class="hidden md:inline">Previous</span>
-            </button>
-            <button id="nextBtn" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                <span class="hidden md:inline">Next</span> <i data-lucide="chevron-right" class="w-5 h-5"></i>
-            </button>
-        </div>
     </main>
 
-    <!-- Footer Selector (Scrollable horizontally) -->
-    <footer class="bg-white border-t border-slate-200 p-4">
-        <div class="max-w-2xl mx-auto">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sections</p>
-            <div id="sectionGrid" class="flex overflow-x-auto gap-2 pb-2 no-scrollbar"></div>
-        </div>
-    </footer>
-
     <script>
+        // Init Lucide Icons
         lucide.createIcons();
-        const App = {
-            data: [], wordsPerSection: 10, sections: [], 
-            curSectionIdx: 0, curCardIdx: 0, isFlipped: false, 
-            completed: [], url: ''
-        };
-        const el = {
-            progress: document.getElementById('progressBar'),
-            progText: document.getElementById('progressText'),
-            settingsPanel: document.getElementById('settingsPanel'),
-            csvUrl: document.getElementById('csvUrlInput'),
-            wps: document.getElementById('wpsInput'),
-            msg: document.getElementById('messageBox'),
-            secTitle: document.getElementById('sectionTitle'),
-            secCheck: document.getElementById('sectionComplete'),
-            cardIdx: document.getElementById('cardIndex'),
-            flashcard: document.getElementById('flashcard'),
-            inner: document.getElementById('flashcardInner'),
-            front: document.getElementById('frontText'),
-            back: document.getElementById('backText'),
-            prev: document.getElementById('prevBtn'),
-            next: document.getElementById('nextBtn'),
-            grid: document.getElementById('sectionGrid')
-        };
-        const fbData = "german,english\nHallo,Hello\nTschüss,Goodbye\nBitte,Please\nDanke,Thank you\nJa,Yes\nNein,No\nEins,One\nZwei,Two\nDrei,Three\nVier,Four\nFünf,Five\nSechs,Six\nSieben,Seven\nAcht,Eight\nNeun,Nine\nZehn,Ten\nGuten Morgen,Good morning\nGuten Abend,Good evening\nEs tut mir leid,I am sorry\nIch heiße...,My name is...\nWie geht es dir?,How are you?";
 
-        function loadStorage() {
-            try {
-                const s = JSON.parse(localStorage.getItem('fcSettings'));
-                if(s) { App.wps = s.wps||10; App.url = s.url||''; App.completed = s.completed||[]; }
-            } catch(e){}
-            el.wps.value = App.wps; el.csvUrl.value = App.url;
-        }
-        function saveStorage() {
-            localStorage.setItem('fcSettings', JSON.stringify({wps: App.wps, url: App.url, completed: App.completed}));
-        }
-        function showMsg(m, err=false) {
-            el.msg.textContent = m;
-            el.msg.className = `text-sm rounded p-3 mb-4 max-w-2xl w-full text-center ${err?'bg-red-50 text-red-600 border border-red-200':'bg-blue-50 text-blue-600 border border-blue-200'}`;
-            el.msg.classList.remove('hidden');
-        }
-        function parseCSV(csv) {
-            const rows = csv.split('\n').map(r => r.trim()).filter(r=>r);
-            if(rows.length < 2) return;
-            App.data = [];
-            for(let i=1; i<rows.length; i++) {
-                let r = rows[i], inQ = false, c1 = "", j=0;
-                while(j < r.length) {
-                    let c = r[j];
-                    if(c==='"') inQ=!inQ;
-                    else if(c===',' && !inQ) break;
-                    else c1+=c;
-                    j++;
-                }
-                if(j<r.length) {
-                    let c2 = r.substring(j+1).trim();
-                    if(c2.startsWith('"')) c2 = c2.substring(1, c2.length-1);
-                    App.data.push({de: c1.trim(), en: c2.trim()});
-                }
-            }
-        }
-        async function init() {
-            loadStorage(); await fetchData();
-            if(App.data.length>0) {
-                buildSections(); jumpStart(); updateUI();
-            } else {
-                showMsg('No valid data parsed.', true);
-            }
-        }
-        async function fetchData() {
-            let txt = fbData;
-            el.msg.classList.add('hidden');
-            if(App.url) {
-                try { 
-                    showMsg('Loading data...'); 
-                    const r = await fetch(App.url); 
-                    if(!r.ok) throw new Error("HTTP error " + r.status);
-                    txt = await r.text(); 
-                    el.msg.classList.add('hidden'); 
-                    showMsg('Data loaded successfully!', false);
-                    setTimeout(() => el.msg.classList.add('hidden'), 2000);
-                }
-                catch(e) { 
-                    console.error("Fetch error:", e);
-                    showMsg('Sheet not found or network error. Using sample.', true); 
-                    txt = fbData; 
-                }
-            } else {
-                showMsg('Using sample dataset. Configure CSV URL in settings.', false);
-                setTimeout(() => el.msg.classList.add('hidden'), 3000);
-            }
-            parseCSV(txt);
-        }
-        function buildSections() {
-            App.sections = []; 
-            const L = App.data.length; 
-            let w = parseInt(App.wps)||10; 
-            if(w < 1) w = 10;
-            App.wps = w;
-            for(let i=0; i<L; i+=w) App.sections.push({start: i, end: Math.min(i+w-1, L-1)});
-            App.completed = App.completed.filter(i => i < App.sections.length); 
-            saveStorage();
-        }
-        function jumpStart() {
-            App.curSectionIdx = App.sections.findIndex((_,i)=>!App.completed.includes(i));
-            if(App.curSectionIdx===-1) App.curSectionIdx=0;
-            if(App.sections.length > 0) App.curCardIdx = App.sections[App.curSectionIdx].start;
-        }
-        function updateUI() {
-            if (App.sections.length === 0) return;
-            const s = App.sections[App.curSectionIdx], total = s.end-s.start+1, rel = App.curCardIdx-s.start;
-            const w = App.data[App.curCardIdx];
-            if(App.isFlipped) {
-                App.isFlipped=false;
-                el.inner.classList.remove('rotate-y-180');
-            }
-            el.front.textContent = w.de; el.back.textContent = w.en;
-            el.cardIdx.textContent = `${rel+1}/${total}`;
-            el.secTitle.textContent = `Section ${App.curSectionIdx+1}`;
-            el.prev.disabled = rel===0; el.next.disabled = rel===total-1;
-            el.secCheck.checked = App.completed.includes(App.curSectionIdx);
-            
-            const pct = App.sections.length? Math.round((App.completed.length/App.sections.length)*100):0;
-            el.progress.style.width = pct+'%'; el.progText.textContent = pct+'%';
-            renderGrid();
-        }
-        function renderGrid() {
-            el.grid.innerHTML = '';
-            App.sections.forEach((_, i) => {
-                const comp = App.completed.includes(i), act = i===App.curSectionIdx;
-                const b = document.createElement('button');
-                b.className = `min-w-[4rem] px-3 py-2 rounded-lg text-sm font-medium transition-colors border flex flex-col items-center gap-1 flex-shrink-0 ${act?'bg-blue-600 text-white border-blue-600 shadow-md':comp?'bg-green-50 text-green-700 border-green-200 outline outline-1 outline-green-200':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`;
-                b.innerHTML = `<span>${i+1}</span>${comp?('<i data-lucide="check" class="w-3 h-3 '+(act?'text-white':'')+ '"></i>'):''}`;
-                b.onclick = () => { App.curSectionIdx = i; App.curCardIdx = App.sections[i].start; updateUI(); };
-                el.grid.appendChild(b);
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.log('SW registration failed: ', err);
+                });
             });
-            lucide.createIcons();
-            // Automatically scroll the current section block into view
-            setTimeout(()=> { 
-                const c=el.grid.children[App.curSectionIdx]; 
-                if(c) c.scrollIntoView({behavior:'smooth',inline:'center', block:'nearest'}); 
-            }, 100);
         }
-        function flip() { App.isFlipped=!App.isFlipped; el.inner.classList.toggle('rotate-y-180', App.isFlipped); scroll(0,0); }
-        function play(e) {
-            e.stopPropagation();
-            const w = App.data[App.curCardIdx], txt = App.isFlipped?w.en:w.de, lang = App.isFlipped?'en-US':'de-DE';
-            if(window.speechSynthesis) {
-                window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(txt); u.lang = lang;
-                const v = window.speechSynthesis.getVoices().find(x=>x.lang.startsWith(lang.substring(0,2))&&x.name.includes('Natural'));
-                if(v) u.voice = v;
-                window.speechSynthesis.speak(u);
+
+        // --- DATA & STATE ---
+        const App = {
+            mode: 'none', // 'demo' | 'admin'
+            GAS_PWA_URL: 'https://script.google.com/macros/s/AKfycbwA9uiHqPIZnCSkt86Tv_xqjWP9254Y5BlFY4XqGcETQWGUUBWZ2-fA7OOzGchr_hq_/exec',
+            wordsPerSection: 10,
+            words: [],
+            sections: [],
+            currentSectionIdx: 0,
+            
+            // Loop State
+            loopWords: [], // indices
+            loopCardIdx: 0, // index inside loopWords
+            isFlipped: false
+        };
+
+        const demoData = [
+            { de: "Hallo", en: "Hello" },
+            { de: "Tschüss", en: "Goodbye" },
+            { de: "Bitte", en: "Please" },
+            { de: "Danke", en: "Thank you" },
+            { de: "Ja", en: "Yes" },
+            { de: "Nein", en: "No" },
+            { de: "Entschuldigung", en: "Excuse me" },
+            { de: "Guten Morgen", en: "Good morning" },
+            { de: "Gute Nacht", en: "Good night" },
+            { de: "Wie geht es dir?", en: "How are you?" }
+        ].map((w, i) => ({ id: `d_${i}`, de: w.de, en: w.en, status: 'unlearned' }));
+
+        // --- CORE UI LOGIC ---
+        const UI = {
+            views: ['landing', 'login', 'dashboard', 'flashcard', 'summary'],
+            
+            showView(viewName) {
+                this.views.forEach(v => {
+                    const el = document.getElementById(`view-${v}`);
+                    if(el) {
+                        if(v === viewName) {
+                            el.classList.remove('hidden');
+                            el.classList.add('flex'); // Need explicit flex for layout
+                        } else {
+                            el.classList.add('hidden');
+                            el.classList.remove('flex');
+                        }
+                    }
+                });
+                
+                // Header badge logic
+                const badge = document.getElementById('headerStatus');
+                if(App.mode === 'none' || viewName === 'landing' || viewName === 'login') {
+                    badge.classList.add('hidden');
+                } else {
+                    badge.classList.remove('hidden');
+                    badge.textContent = App.mode === 'admin' ? 'Admin' : 'Demo';
+                    badge.className = App.mode === 'admin' 
+                        ? 'text-xs font-bold px-2 py-1 rounded bg-blue-100 text-blue-700'
+                        : 'text-xs font-bold px-2 py-1 rounded bg-amber-100 text-amber-700';
+                }
+            },
+            
+            showMsg(text, isError=false, duration=3000) {
+                const box = document.getElementById('messageBox');
+                box.textContent = text;
+                box.className = `text-sm font-medium rounded-lg p-3 mb-4 w-full text-center shadow-sm absolute top-4 left-1/2 -translate-x-1/2 max-w-sm z-50 ${isError?'bg-red-50 text-red-600 border border-red-200':'bg-blue-50 text-blue-700 border border-blue-200'}`;
+                box.classList.remove('hidden');
+                
+                setTimeout(() => box.classList.add('hidden'), duration);
             }
-        }
-        el.flashcard.addEventListener('click', flip);
-        document.querySelectorAll('.audioBtn').forEach(b => b.addEventListener('click', play));
-        el.prev.addEventListener('click', () => { App.curCardIdx--; updateUI(); });
-        el.next.addEventListener('click', () => { App.curCardIdx++; updateUI(); });
-        el.secCheck.addEventListener('change', (e) => {
-            if(e.target.checked) { if(!App.completed.includes(App.curSectionIdx)) App.completed.push(App.curSectionIdx); }
-            else App.completed = App.completed.filter(i=>i!==App.curSectionIdx);
-            saveStorage(); updateUI();
-        });
-        document.getElementById('settingsBtn').addEventListener('click', ()=>el.settingsPanel.classList.toggle('hidden'));
-        document.getElementById('saveSettingsBtn').addEventListener('click', async ()=> {
-            App.wps = parseInt(el.wps.value)||10; App.url = el.csvUrl.value.trim();
-            el.settingsPanel.classList.add('hidden'); saveStorage();
-            await fetchData(); buildSections(); jumpStart(); updateUI();
-        });
-        document.getElementById('resetDataBtn').addEventListener('click', () => {
-             App.completed = [];
-             saveStorage();
-             jumpStart();
-             updateUI();
-             el.settingsPanel.classList.add('hidden');
-        });
-        window.addEventListener('keydown', e => {
-            if(!el.settingsPanel.classList.contains('hidden')) return;
-            if(e.code==='Space'||e.key===' ') { e.preventDefault(); flip(); }
-            else if(e.code==='ArrowRight'&&!el.next.disabled) { e.preventDefault(); el.next.click(); }
-            else if(e.code==='ArrowLeft'&&!el.prev.disabled) { e.preventDefault(); el.prev.click(); }
-        });
-        init();
+        };
+
+        // --- APP LOGIC ---
+
+        App.startDemo = () => {
+            App.mode = 'demo';
+            
+            // Try to load local progress
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem('fc_demo_words')); } catch(e){}
+            
+            if(saved && saved.length > 0) {
+                App.words = saved;
+            } else {
+                App.words = JSON.parse(JSON.stringify(demoData)); // Deep copy
+            }
+            
+            document.getElementById('syncBtn').classList.add('hidden');
+            App.buildSections();
+            UI.showView('dashboard');
+        };
+
+        App.verifyLogin = async () => {
+            const pwd = document.getElementById('passcodeInput').value;
+            if(pwd === '6666') {
+                App.mode = 'admin';
+                document.getElementById('syncBtn').classList.remove('hidden');
+                document.getElementById('passcodeInput').value = '';
+                UI.showMsg('Logging in...');
+                await App.syncWithCloud();
+                UI.showView('dashboard');
+            } else {
+                UI.showMsg('Incorrect passcode', true);
+            }
+        };
+
+        App.syncWithCloud = async () => {
+            if(App.mode !== 'admin') return;
+            
+            UI.showMsg('Syncing w/ Cloud...');
+            const btn = document.getElementById('syncBtn');
+            btn.innerHTML = `<i data-lucide="refresh-cw" class="w-4 h-4 animate-spin"></i> Syncing`;
+            lucide.createIcons();
+            
+            try {
+                // If the GAS endpoint is a dummy, we emulate it
+                if(App.GAS_PWA_URL.includes('YOUR_GOOGLE')) {
+                    console.log("GAS_PWA_URL not set. Running simulation locally.");
+                    // Simulate fetching a bigger list and network delay
+                    await new Promise(r => setTimeout(r, 1000));
+                    
+                    if(App.words.length === 0) {
+                        let simWords = [];
+                        for(let i=0; i<50; i++) {
+                            simWords.push({
+                                id: `a_${i}`,
+                                de: `Word ${i+1}`,
+                                en: `Translation ${i+1}`,
+                                status: Math.random() > 0.8 ? 'learned' : 'unlearned'
+                            });
+                        }
+                        App.words = simWords;
+                    }
+                    UI.showMsg('Sync simulated successfully (Demo mode essentially)');
+                } else {
+                    const res = await fetch(`${App.GAS_PWA_URL}?action=getWords`);
+                    const data = await res.json();
+                    if(data.success) {
+                        App.words = data.words;
+                        UI.showMsg('Synced with Google Sheets successfully!', false, 2000);
+                    } else {
+                        throw new Error(data.error);
+                    }
+                }
+                
+                App.buildSections();
+                App.renderDashboard();
+                
+            } catch (err) {
+                console.error(err);
+                UI.showMsg('Failed to sync via Cloud', true);
+            } finally {
+                btn.innerHTML = `<i data-lucide="refresh-cw" class="w-4 h-4"></i> Sync`;
+                lucide.createIcons();
+            }
+        };
+
+        App.buildSections = () => {
+            App.sections = [];
+            let wps = App.wordsPerSection;
+            for(let i=0; i<App.words.length; i+=wps) {
+                App.sections.push({
+                    start: i,
+                    end: Math.min(i + wps - 1, App.words.length - 1)
+                });
+            }
+            App.renderDashboard();
+        };
+
+        App.renderDashboard = () => {
+            document.getElementById('dashTotalWords').textContent = `${App.words.length} words total`;
+            
+            // Overall progress
+            const learnedCount = App.words.filter(w => w.status === 'learned').length;
+            const pct = App.words.length ? Math.round((learnedCount / App.words.length) * 100) : 0;
+            document.getElementById('dashProgressPct').textContent = `${pct}%`;
+            document.getElementById('dashProgressBar').style.width = `${pct}%`;
+            
+            const grid = document.getElementById('sectionsGrid');
+            grid.innerHTML = '';
+            
+            App.sections.forEach((sec, idx) => {
+                // Determine section status
+                let secWords = App.words.slice(sec.start, sec.end + 1);
+                let lCount = secWords.filter(w => w.status === 'learned').length;
+                let total = secWords.length;
+                let isComplete = lCount === total;
+                let progressStr = `${lCount}/${total}`;
+                
+                const btn = document.createElement('div');
+                btn.className = `p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-colors active:scale-95 ${
+                    isComplete 
+                    ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                    : 'bg-white border-slate-200 hover:bg-slate-50 shadow-sm'
+                }`;
+                btn.onclick = () => App.openSection(idx);
+                
+                btn.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-bold text-slate-700 text-lg">S${idx + 1}</span>
+                        ${isComplete ? '<i data-lucide="check-circle" class="w-5 h-5 text-green-500"></i>' : ''}
+                    </div>
+                    <div class="text-xs font-semibold ${isComplete?'text-green-600':'text-slate-400'}">${progressStr} Learned</div>
+                `;
+                
+                grid.appendChild(btn);
+            });
+            
+            lucide.createIcons();
+        };
+
+        App.openSection = (idx) => {
+            App.currentSectionIdx = idx;
+            const sec = App.sections[idx];
+            
+            // Init loop with unlearned words, OR all if they are all learned but user wants to review
+            let secWordsIndices = [];
+            for(let i = sec.start; i <= sec.end; i++) {
+                if(App.words[i].status !== 'learned') secWordsIndices.push(i);
+            }
+            
+            // If all learned, just review all
+            if(secWordsIndices.length === 0) {
+                for(let i = sec.start; i <= sec.end; i++) secWordsIndices.push(i);
+            }
+            
+            App.loopWords = secWordsIndices;
+            App.startLoop();
+        };
+
+        App.startLoop = () => {
+            if(App.loopWords.length === 0) {
+                App.finishSection();
+                return;
+            }
+            // Shuffle loop
+            App.loopWords = App.loopWords.sort(() => Math.random() - 0.5);
+            App.loopCardIdx = 0;
+            App.isFlipped = false;
+            
+            UI.showView('flashcard');
+            App.renderCard();
+        };
+
+        App.renderCard = () => {
+            const wIdx = App.loopWords[App.loopCardIdx];
+            const word = App.words[wIdx];
+            
+            document.getElementById('fcSectionTitle').textContent = `Section ${App.currentSectionIdx + 1}`;
+            document.getElementById('fcCardIndex').textContent = `${App.loopCardIdx + 1}/${App.loopWords.length}`;
+            
+            const inner = document.getElementById('flashcardInner');
+            if(App.isFlipped) {
+                App.isFlipped = false;
+                inner.classList.remove('rotate-y-180');
+            }
+            
+            document.getElementById('fcFrontText').textContent = word.de;
+            document.getElementById('fcBackText').textContent = word.en;
+            
+            const controls = document.getElementById('learningControls');
+            controls.classList.add('opacity-50', 'pointer-events-none');
+            
+            // Hide word status indicator
+            const ind = document.getElementById('wordStatusIndicator');
+            ind.style.opacity = '0';
+        };
+
+        App.flipCard = () => {
+            App.isFlipped = !App.isFlipped;
+            const inner = document.getElementById('flashcardInner');
+            const controls = document.getElementById('learningControls');
+            
+            if(App.isFlipped) {
+                inner.classList.add('rotate-y-180');
+                controls.classList.remove('opacity-50', 'pointer-events-none');
+            } else {
+                inner.classList.remove('rotate-y-180');
+                controls.classList.add('opacity-50', 'pointer-events-none');
+            }
+        };
+
+        App.rateCard = (rating) => {
+            // Anim effect
+            const ind = document.getElementById('wordStatusIndicator');
+            ind.textContent = rating === 'learned' ? '✔️ LEARNED' : '❌ UNLEARNED';
+            ind.className = `absolute bottom-16 text-sm font-bold opacity-100 transition-opacity drop-shadow-sm ${rating==='learned' ? 'text-green-600' : 'text-red-600'}`;
+            
+            // Update global word state
+            const wIdx = App.loopWords[App.loopCardIdx];
+            App.words[wIdx].status = rating;
+            
+            // Save state
+            App.saveDataLocally();
+            
+            setTimeout(() => {
+                // Next card
+                App.loopCardIdx++;
+                if(App.loopCardIdx >= App.loopWords.length) {
+                    App.showSummary();
+                } else {
+                    App.renderCard();
+                }
+            }, 500);
+        };
+
+        App.showSummary = () => {
+            const sec = App.sections[App.currentSectionIdx];
+            let unlearnedIndices = [];
+            let learnedCount = 0;
+            let unlearnedCount = 0;
+            
+            for(let i=sec.start; i<=sec.end; i++) {
+                if(App.words[i].status === 'learned') {
+                    learnedCount++;
+                } else {
+                    unlearnedCount++;
+                    unlearnedIndices.push(i);
+                }
+            }
+            
+            document.getElementById('sumLearned').textContent = learnedCount;
+            document.getElementById('sumUnlearned').textContent = unlearnedCount;
+            
+            const btnAgain = document.getElementById('btnStartAgain');
+            const txtAgain = document.getElementById('btnStartAgainText');
+            
+            if(unlearnedIndices.length > 0) {
+                btnAgain.classList.remove('hidden');
+                btnAgain.classList.add('flex');
+                txtAgain.textContent = `Start Again (${unlearnedIndices.length} words)`;
+                App.loopWords = unlearnedIndices; // Ready for next loop
+            } else {
+                btnAgain.classList.add('hidden');
+                btnAgain.classList.remove('flex');
+            }
+            
+            UI.showView('summary');
+        };
+
+        App.finishSection = async () => {
+            App.renderDashboard();
+            UI.showView('dashboard');
+            
+            if(App.mode === 'admin') {
+                UI.showMsg('Syncing changes to cloud...', false, 2000);
+                try {
+                    const res = await fetch(App.GAS_PWA_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'updateWords', words: App.words })
+                    });
+                    const data = await res.json();
+                    if(data.success) {
+                       UI.showMsg('Progress saved to cloud!', false, 2000);
+                    } else {
+                       throw new Error(data.error);
+                    }
+                } catch(e) {
+                    console.error('Cloud Sync Error:', e);
+                    UI.showMsg('Failed to save to cloud.', true, 3000);
+                }
+            }
+        };
+
+        App.saveDataLocally = () => {
+            if(App.mode === 'demo') {
+                localStorage.setItem('fc_demo_words', JSON.stringify(App.words));
+            }
+        };
+
+        App.playAudio = (e, langPrefix) => {
+            e.stopPropagation(); // prevent card flip
+            if(!window.speechSynthesis) return;
+            
+            const text = langPrefix === 'de' 
+                ? document.getElementById('fcFrontText').textContent 
+                : document.getElementById('fcBackText').textContent;
+                
+            let lang = langPrefix === 'de' ? 'de-DE' : 'en-US';
+            
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = lang;
+            
+            const voice = window.speechSynthesis.getVoices().find(x => x.lang.startsWith(lang.substring(0,2)) && x.name.includes('Natural'));
+            if(voice) u.voice = voice;
+            
+            window.speechSynthesis.speak(u);
+        };
         
-        // Ensure voices are loaded so they are ready
-        if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis.onvoiceschanged !== undefined) {
-          window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-        }
+        // Initial setup
+        window.speechSynthesis && window.speechSynthesis.getVoices();
+        
     </script>
 </body>
 </html>
