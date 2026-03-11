@@ -38,7 +38,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans h-screen flex flex-col antialiased relative overflow-hidden">
+<body class="bg-slate-50 text-slate-900 font-sans h-[100dvh] flex flex-col antialiased relative overflow-hidden" style="padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);">
     
     <!-- HEADER -->
     <header class="bg-white shadow-sm p-4 z-20 flex-shrink-0">
@@ -46,8 +46,13 @@
             <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 cursor-pointer" onclick="UI.showView('landing')">
                 <i data-lucide="languages"></i> FC
             </h1>
-            <div id="headerStatus" class="text-xs font-medium px-2 py-1 rounded bg-slate-100 text-slate-500 hidden">
-                Mode
+            <div class="flex items-center gap-3">
+                <div id="headerStatus" class="text-xs font-medium px-2 py-1 rounded bg-slate-100 text-slate-500 hidden">
+                    Mode
+                </div>
+                <button onclick="UI.showView('landing')" class="text-slate-400 hover:text-slate-700 transition-colors p-1" aria-label="Home">
+                    <i data-lucide="home" class="w-5 h-5"></i>
+                </button>
             </div>
         </div>
     </header>
@@ -71,9 +76,9 @@
                 <span class="text-xs font-normal text-slate-500 block absolute mt-10">Public • Progress saved locally</span>
             </button>
             
-            <button onclick="UI.showView('login')" class="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-md transition-colors flex items-center justify-center gap-3 mt-4">
+            <button onclick="App.tryAdminLogin()" class="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-md transition-colors flex items-center justify-center gap-3 mt-4 relative">
                 <i data-lucide="lock" class="w-5 h-5"></i> Admin Mode
-                <span class="text-xs font-normal text-blue-200 block absolute mt-10">Personal • Google Cloud Sync</span>
+                <span class="text-xs font-normal text-blue-200 block absolute mt-11">Personal • Google Cloud Sync</span>
             </button>
         </div>
 
@@ -123,7 +128,7 @@
         <!-- 4. FLASHCARD APP VIEW -->
         <div id="view-flashcard" class="w-full max-w-[400px] flex-col hidden pb-4 h-full">
             <!-- Header for Card View -->
-            <div class="flex justify-between items-center mb-6 mt-2">
+            <div class="flex justify-between items-center mb-6 mt-2 flex-shrink-0">
                 <button onclick="UI.showView('dashboard')" class="p-2 -ml-2 text-slate-400 hover:text-slate-700 transition-colors">
                     <i data-lucide="x" class="w-6 h-6"></i>
                 </button>
@@ -135,11 +140,12 @@
                 <div class="w-10"></div>
             </div>
 
-            <!-- Flashcard 3D Wrapper -->
-            <div class="w-full aspect-[4/3] perspective-1000 cursor-pointer group mb-10 flex-shrink-0" id="flashcard" onclick="App.flipCard()">
-                <div id="flashcardInner" class="relative w-full h-full duration-600 transform-style-3d shadow-lg rounded-2xl">
-                    
-                    <!-- Front (German) -->
+            <!-- Flashcard 3D Wrapper (Centered Vertically) -->
+            <div class="flex-1 w-full flex flex-col justify-center items-center pb-8 min-h-0">
+                <div class="w-full aspect-[4/3] perspective-1000 cursor-pointer group flex-shrink-0 my-auto" id="flashcard" onclick="App.flipCard()">
+                    <div id="flashcardInner" class="relative w-full h-full duration-600 transform-style-3d shadow-lg rounded-2xl">
+                        
+                        <!-- Front (German) -->
                     <div class="card-face bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 text-center z-10">
                         <button id="frontAudioBtn" class="absolute top-4 right-4 p-3 text-blue-500 hover:bg-blue-50 rounded-full z-20 disabled:opacity-50" onclick="App.playAudio(event, 'de')">
                             <i data-lucide="volume-2" class="w-6 h-6"></i>
@@ -162,15 +168,13 @@
                 </div>
             </div>
 
-            <!-- Learning Controls (Only visibly active when flipped) -->
-            <div class="w-full flex justify-center gap-4 transition-opacity duration-300 opacity-50 pointer-events-none" id="learningControls">
-                <button onclick="App.rateCard('unlearned')" class="flex-1 bg-white border-2 border-red-200 hover:bg-red-50 text-red-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center gap-1 active:bg-red-100 focus:outline-none">
-                    <i data-lucide="x-circle" class="w-6 h-6"></i>
-                    <span>Unlearned</span>
+            <!-- Learning Controls (Bottom Aligned, Actionable anywhere) -->
+            <div class="w-full flex justify-center gap-4 mt-auto mb-4" id="learningControls">
+                <button onclick="App.rateCard('unlearned', event)" style="touch-action: manipulation;" class="flex-1 min-h-[80px] bg-white border-2 border-red-200 hover:bg-red-50 text-red-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center justify-center gap-1 active:bg-red-100 focus:outline-none">
+                    <i data-lucide="x" class="w-12 h-12"></i>
                 </button>
-                <button onclick="App.rateCard('learned')" class="flex-1 bg-white border-2 border-green-200 hover:bg-green-50 text-green-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center gap-1 active:bg-green-100 focus:outline-none">
-                    <i data-lucide="check-circle-2" class="w-6 h-6"></i>
-                    <span>Learned</span>
+                <button onclick="App.rateCard('learned', event)" style="touch-action: manipulation;" class="flex-1 min-h-[80px] bg-white border-2 border-green-200 hover:bg-green-50 text-green-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center justify-center gap-1 active:bg-green-100 focus:outline-none">
+                    <i data-lucide="check" class="w-12 h-12 stroke-[3px]"></i>
                 </button>
             </div>
         </div>
@@ -311,10 +315,22 @@
             UI.showView('dashboard');
         };
 
+        App.tryAdminLogin = () => {
+            if(sessionStorage.getItem('fc_admin_auth') === 'true') {
+                App.mode = 'admin';
+                document.getElementById('syncBtn').classList.remove('hidden');
+                UI.showMsg('Resuming Admin Session...');
+                App.syncWithCloud().then(() => UI.showView('dashboard'));
+            } else {
+                UI.showView('login');
+            }
+        };
+
         App.verifyLogin = async () => {
             const pwd = document.getElementById('passcodeInput').value;
             if(pwd === '6666') {
                 App.mode = 'admin';
+                sessionStorage.setItem('fc_admin_auth', 'true');
                 document.getElementById('syncBtn').classList.remove('hidden');
                 document.getElementById('passcodeInput').value = '';
                 UI.showMsg('Logging in...');
@@ -477,10 +493,16 @@
             }
             
             document.getElementById('fcFrontText').textContent = word.de;
-            document.getElementById('fcBackText').textContent = word.en;
+            // Clear the back immediately if returning from a flip to prevent bleeding
+            if(!App.isFlipped) {
+                document.getElementById('fcBackText').textContent = '...';
+            } else {
+                document.getElementById('fcBackText').textContent = word.en;
+            }
             
+            // Buttons always active now
             const controls = document.getElementById('learningControls');
-            controls.classList.add('opacity-50', 'pointer-events-none');
+            // controls.classList.add('opacity-50', 'pointer-events-none');
             
             // Hide word status indicator
             const ind = document.getElementById('wordStatusIndicator');
@@ -494,14 +516,22 @@
             
             if(App.isFlipped) {
                 inner.classList.add('rotate-y-180');
-                controls.classList.remove('opacity-50', 'pointer-events-none');
+                
+                // Only reveal English text when flipping to the back
+                const currentWord = App.words[App.loopWords[App.loopCardIdx]];
+                document.getElementById('fcBackText').textContent = currentWord.en;
+                // controls.classList.remove('opacity-50', 'pointer-events-none');
             } else {
                 inner.classList.remove('rotate-y-180');
-                controls.classList.add('opacity-50', 'pointer-events-none');
+                // controls.classList.add('opacity-50', 'pointer-events-none');
             }
         };
 
-        App.rateCard = (rating) => {
+        App.rateCard = (rating, event) => {
+            if(event) {
+                event.stopPropagation();
+            }
+            
             // Anim effect
             const ind = document.getElementById('wordStatusIndicator');
             ind.textContent = rating === 'learned' ? '✔️ LEARNED' : '❌ UNLEARNED';
@@ -514,15 +544,23 @@
             // Save state
             App.saveDataLocally();
             
+            // Force flip back to front instantly before changing words to hide the text change
+            if(App.isFlipped) {
+                App.isFlipped = false;
+                document.getElementById('flashcardInner').classList.remove('rotate-y-180');
+            }
+            
+            // Allow time for the flip back to start running before swapping data
             setTimeout(() => {
-                // Next card
                 App.loopCardIdx++;
+                ind.style.opacity = '0'; // reset indicator for next card
+                
                 if(App.loopCardIdx >= App.loopWords.length) {
                     App.showSummary();
                 } else {
                     App.renderCard();
                 }
-            }, 500);
+            }, 300); // reduced timeout to make it feel snappier, wait for flip halfway
         };
 
         App.showSummary = () => {
