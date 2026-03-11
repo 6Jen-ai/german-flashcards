@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>German-English Flashcards</title>
+    <title>Flashcard WebAPP by Jen</title>
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#2563eb">
     <link rel="apple-touch-icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/128x128/1f1e9-1f1ea.png">
@@ -43,14 +43,14 @@
     <!-- HEADER -->
     <header class="bg-white shadow-sm p-4 z-20 flex-shrink-0">
         <div class="max-w-xl mx-auto flex items-center justify-between">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 cursor-pointer" onclick="UI.showView('landing')">
-                <i data-lucide="languages"></i> FC
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 cursor-pointer" onclick="App.handleHomeClick()">
+                <i data-lucide="layers"></i> Flashcard WebAPP by Jen
             </h1>
             <div class="flex items-center gap-3">
                 <div id="headerStatus" class="text-xs font-medium px-2 py-1 rounded bg-slate-100 text-slate-500 hidden">
                     Mode
                 </div>
-                <button onclick="UI.showView('landing')" class="text-slate-400 hover:text-slate-700 transition-colors p-1" aria-label="Home">
+                <button onclick="App.handleHomeClick()" class="text-slate-400 hover:text-slate-700 transition-colors p-1" aria-label="Home">
                     <i data-lucide="home" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -69,6 +69,7 @@
                 <div class="text-6xl mb-4">🇩🇪</div>
                 <h2 class="text-2xl font-bold text-slate-800">Learn German</h2>
                 <p class="text-slate-500 text-sm mt-2">Choose your mode to begin.</p>
+                <p class="text-slate-400 text-xs mt-4 px-6">Optimized for mobile devices. For the best experience, please add this app to your Home Screen.</p>
             </div>
             
             <button onclick="App.startDemo()" class="w-full max-w-xs bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-4 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-3">
@@ -129,7 +130,7 @@
         <div id="view-flashcard" class="w-full max-w-[400px] flex flex-col hidden pb-4 h-full">
             <!-- Header for Card View -->
             <div class="flex justify-between items-start mb-6 mt-2 flex-shrink-0">
-                <button onclick="UI.showView('dashboard')" class="p-2 -ml-2 text-slate-400 hover:text-slate-700 transition-colors" title="Back to Dashboard">
+                <button onclick="App.handleHomeClick(true)" class="p-2 -ml-2 text-slate-400 hover:text-slate-700 transition-colors" title="Back to Dashboard">
                     <i data-lucide="x" class="w-6 h-6"></i>
                 </button>
                 <div class="flex flex-col items-center flex-1">
@@ -174,11 +175,11 @@
 
             <!-- Learning Controls (Bottom Aligned, Actionable anywhere) -->
             <div class="w-full flex justify-center gap-4 mt-auto mb-4" id="learningControls">
-                <button onclick="App.rateCard('unlearned', event)" style="touch-action: manipulation;" class="flex-1 min-h-[80px] bg-white border-2 border-red-200 hover:bg-red-50 text-red-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center justify-center gap-1 active:bg-red-100 focus:outline-none">
-                    <i data-lucide="x" class="w-12 h-12"></i>
+                <button onclick="App.rateCard('unlearned', event)" style="touch-action: manipulation;" class="flex-1 min-h-[100px] bg-white border-2 border-red-200 hover:bg-red-50 text-red-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center justify-center gap-1 active:bg-red-100 focus:outline-none">
+                    <i data-lucide="x" class="w-14 h-14 stroke-[3px]"></i>
                 </button>
-                <button onclick="App.rateCard('learned', event)" style="touch-action: manipulation;" class="flex-1 min-h-[80px] bg-white border-2 border-green-200 hover:bg-green-50 text-green-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center justify-center gap-1 active:bg-green-100 focus:outline-none">
-                    <i data-lucide="check" class="w-12 h-12 stroke-[3px]"></i>
+                <button onclick="App.rateCard('learned', event)" style="touch-action: manipulation;" class="flex-1 min-h-[100px] bg-white border-2 border-green-200 hover:bg-green-50 text-green-600 font-bold py-4 rounded-xl shadow-sm transition-colors flex flex-col items-center justify-center gap-1 active:bg-green-100 focus:outline-none">
+                    <i data-lucide="check" class="w-14 h-14 stroke-[4px]"></i>
                 </button>
             </div>
         </div>
@@ -244,6 +245,7 @@
             loopWords: [], // indices
             loopCardIdx: 0, // index inside loopWords
             isFlipped: false,
+            sessionResults: {}, // Tracks results strictly for the current session
             
             // Security State
             lastActivityTime: Date.now()
@@ -523,6 +525,23 @@
             App.startLoop();
         };
 
+        App.handleHomeClick = (toDashboard = false) => {
+            const isFlashcardView = !document.getElementById('view-flashcard').classList.contains('hidden');
+            
+            if (isFlashcardView) {
+                if(confirm("Are you sure you want to leave the current session?")) {
+                    if(confirm("Would you like to save your progress before leaving?")) {
+                        if(App.mode === 'admin') App.syncUp(); // Silent background sync
+                        else App.saveDataLocally();
+                    }
+                    App.renderDashboard();
+                    UI.showView(toDashboard ? 'dashboard' : 'landing');
+                }
+            } else {
+                UI.showView(toDashboard ? 'dashboard' : 'landing');
+            }
+        };
+
         App.openSection = (idx) => {
             App.currentSectionIdx = idx;
             const sec = App.sections[idx];
@@ -546,6 +565,11 @@
             if(App.loopWords.length === 0) {
                 App.finishSection();
                 return;
+            }
+            
+            // Clear session array on a totally fresh start or restart
+            if(App.loopCardIdx === 0) {
+                App.sessionResults = {};
             }
             // Fisher-Yates Shuffle
             const arr = [...App.loopWords];
@@ -593,6 +617,7 @@
         };
 
         App.flipCard = () => {
+            if(App.checkSessionExpiry()) return;
             App.isFlipped = !App.isFlipped;
             const inner = document.getElementById('flashcardInner');
             const controls = document.getElementById('learningControls');
@@ -614,15 +639,17 @@
             if(event) {
                 event.stopPropagation();
             }
+            if(App.checkSessionExpiry()) return;
             
             // Anim effect
             const ind = document.getElementById('wordStatusIndicator');
             ind.textContent = rating === 'learned' ? '✔️ LEARNED' : '❌ UNLEARNED';
             ind.className = `absolute bottom-16 text-sm font-bold opacity-100 transition-opacity drop-shadow-sm ${rating==='learned' ? 'text-green-600' : 'text-red-600'}`;
             
-            // Update global word state
+            // Update global word state and active session tracker
             const wIdx = App.loopWords[App.loopCardIdx];
             App.words[wIdx].status = rating;
+            App.sessionResults[wIdx] = rating;
             
             // Save state
             App.saveDataLocally();
@@ -647,17 +674,17 @@
         };
 
         App.showSummary = () => {
-            const sec = App.sections[App.currentSectionIdx];
             let unlearnedIndices = [];
             let learnedCount = 0;
             let unlearnedCount = 0;
             
-            for(let i=sec.start; i<=sec.end; i++) {
-                if(App.words[i].status === 'learned') {
+            for (const [wIdxStr, status] of Object.entries(App.sessionResults)) {
+                const wIdx = parseInt(wIdxStr, 10);
+                if(status === 'learned') {
                     learnedCount++;
                 } else {
                     unlearnedCount++;
-                    unlearnedIndices.push(i);
+                    unlearnedIndices.push(wIdx);
                 }
             }
             
@@ -747,6 +774,30 @@
         
         // Initial setup
         window.speechSynthesis && window.speechSynthesis.getVoices();
+
+        // Security: Passive Session Timeout Check
+        App.checkSessionExpiry = () => {
+            if (App.mode !== 'admin') return false; // Only affects authenticated users
+            const now = Date.now();
+            if (now - App.lastActivityTime > 5 * 60 * 1000) {
+                // 5 minutes elapsed
+                sessionStorage.setItem('fc_admin_auth', 'false');
+                App.mode = 'none';
+                App.words = [];
+                App.sections = [];
+                UI.showView('landing');
+                UI.showMsg('Session expired due to inactivity. Please log in again.', true, 5000);
+                return true; // Expired
+            }
+            // Update last activity
+            App.lastActivityTime = now;
+            return false; // Active
+        };
+
+        // Attach global activity listener for the app
+        document.body.addEventListener('click', () => { App.lastActivityTime = Date.now(); }, true);
+        document.body.addEventListener('touchstart', () => { App.lastActivityTime = Date.now(); }, true);
+        document.body.addEventListener('scroll', () => { App.lastActivityTime = Date.now(); }, true);
         
     </script>
 </body>
