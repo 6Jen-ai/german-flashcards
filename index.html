@@ -245,7 +245,8 @@
             loopWords: [], // indices
             loopCardIdx: 0, // index inside loopWords
             isFlipped: false,
-            sessionResults: {}, // Tracks results strictly for the current session
+            sessionResults: { correct: 0, incorrect: 0, total: 0, unlearnedIndices: [] }, // Tracks results strictly for the current session
+            isProcessing: false, // Prevents multiple rapid clicks
             
             // Security State
             lastActivityTime: Date.now()
@@ -529,11 +530,10 @@
             const isFlashcardView = !document.getElementById('view-flashcard').classList.contains('hidden');
             
             if (isFlashcardView) {
-                if(confirm("Are you sure you want to leave the current session?")) {
-                    if(confirm("Would you like to save your progress before leaving?")) {
-                        if(App.mode === 'admin') App.syncUp(); // Silent background sync
-                        else App.saveDataLocally();
-                    }
+                if(confirm("Are you sure you want to leave? Your progress will be saved.")) {
+                    if(App.mode === 'admin') App.syncUp(); // Silent background sync
+                    else App.saveDataLocally();
+                    
                     App.renderDashboard();
                     UI.showView(toDashboard ? 'dashboard' : 'landing');
                 }
@@ -569,7 +569,7 @@
             
             // Clear session array on a totally fresh start or restart
             if(App.loopCardIdx === 0) {
-                App.sessionResults = {};
+                App.sessionResults = { correct: 0, incorrect: 0, total: 0, unlearnedIndices: [] };
             }
             // Fisher-Yates Shuffle
             const arr = [...App.loopWords];
@@ -639,7 +639,9 @@
             if(event) {
                 event.stopPropagation();
             }
-            if(App.checkSessionExpiry()) return;
+            if(App.checkSessionExpiry() || App.isProcessing) return;
+            
+            App.isProcessing = true;
             
             // Anim effect
             const ind = document.getElementById('wordStatusIndicator');
@@ -649,7 +651,14 @@
             // Update global word state and active session tracker
             const wIdx = App.loopWords[App.loopCardIdx];
             App.words[wIdx].status = rating;
-            App.sessionResults[wIdx] = rating;
+            
+            App.sessionResults.total++;
+            if(rating === 'learned') {
+                App.sessionResults.correct++;
+            } else {
+                App.sessionResults.incorrect++;
+                App.sessionResults.unlearnedIndices.push(wIdx);
+            }
             
             // Save state
             App.saveDataLocally();
@@ -670,34 +679,22 @@
                 } else {
                     App.renderCard();
                 }
+                
+                App.isProcessing = false; // release lock
             }, 300); // reduced timeout to make it feel snappier, wait for flip halfway
         };
 
         App.showSummary = () => {
-            let unlearnedIndices = [];
-            let learnedCount = 0;
-            let unlearnedCount = 0;
-            
-            for (const [wIdxStr, status] of Object.entries(App.sessionResults)) {
-                const wIdx = parseInt(wIdxStr, 10);
-                if(status === 'learned') {
-                    learnedCount++;
-                } else {
-                    unlearnedCount++;
-                    unlearnedIndices.push(wIdx);
-                }
-            }
-            
-            document.getElementById('sumLearned').textContent = learnedCount;
-            document.getElementById('sumUnlearned').textContent = unlearnedCount;
+            document.getElementById('sumLearned').textContent = App.sessionResults.correct;
+            document.getElementById('sumUnlearned').textContent = App.sessionResults.incorrect;
             
             const btnAgain = document.getElementById('btnStartAgain');
             const txtAgain = document.getElementById('btnStartAgainText');
             
-            if(unlearnedIndices.length > 0) {
+            if(App.sessionResults.unlearnedIndices && App.sessionResults.unlearnedIndices.length > 0) {
                 btnAgain.classList.remove('hidden');
-                txtAgain.textContent = `Restart Unlearned (${unlearnedIndices.length} words)`;
-                App.loopWords = unlearnedIndices; // Ready for next loop
+                txtAgain.textContent = `Restart Unlearned (${App.sessionResults.unlearnedIndices.length} words)`;
+                App.loopWords = [...App.sessionResults.unlearnedIndices]; // Ready for next loop
             } else {
                 btnAgain.classList.add('hidden');
             }
