@@ -5,7 +5,7 @@
  *   npm install firebase-admin
  *
  * Place your Firebase service account key as:
- *   ./serviceAccountKey.json
+ *   ./firebase-admin-key.json
  * (Download from Firebase Console → Project Settings → Service Accounts → Generate new private key)
  *
  * Usage:
@@ -23,10 +23,10 @@ const fs = require('fs');
 const path = require('path');
 
 // ── Firebase Init ──────────────────────────────────────────────────────────
-// Support both serviceAccountKey.json and serviceAccountKey.json.json
+// Support both firebase-admin-key.json and firebase-admin-key.json.json
 let serviceAccount;
-try { serviceAccount = require('./serviceAccountKey.json'); }
-catch { serviceAccount = require('./serviceAccountKey.json.json'); }
+try { serviceAccount = require('./firebase-admin-key.json'); }
+catch { serviceAccount = require('./firebase-admin-key.json.json'); }
 
 initializeApp({
   credential: cert(serviceAccount),

@@ -48,7 +48,7 @@ Open `A1 Wordlist.csv` in Excel or any text editor.
 
 1. Go to [Firebase Console](https://console.firebase.google.com/) → **Project: flashcard-de**.
 2. Navigate to **Project Settings → Service Accounts → Generate new private key**.
-3. Save the downloaded JSON as **`serviceAccountKey.json`** in this project folder.
+3. Save the downloaded JSON as **`firebase-admin-key.json`** in this project folder.
 4. Install the admin SDK (one-time):
    ```bash
    npm install firebase-admin
@@ -95,7 +95,7 @@ german-flashcards/
 ├── A1 Wordlist.csv     # Vocabulary source data
 ├── manifest.json       # PWA manifest
 ├── sw.js               # Service worker (offline cache)
-├── serviceAccountKey.json  # ← YOU ADD THIS (not committed to git)
+├── firebase-admin-key.json  # ← YOU ADD THIS (not committed to git)
 └── README.md           # This file
 ```
 
