@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Flashcard WebAPP by Jen</title>
+    <meta name="description" content="German A1 vocabulary flashcards — optimized for phones.">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/128x128/1f1e9-1f1ea.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Firebase v10 compat CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:       #000000;
+            --surface:  #0d0d0d;
+            --surface2: #1a1a1a;
+            --border:   #2a2a2a;
+            --text:     #f1f5f9;
+            --muted:    #64748b;
+            --emerald:  #10b981;
+            --emerald2: #059669;
+            --rose:     #f43f5e;
+            --rose2:    #e11d48;
+            --slate:    #475569;
+            --amber:    #f59e0b;
+            --header-h: calc(56px + env(safe-area-inset-top));
+        }
+
+        html, body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            overscroll-behavior: none;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+        }
+
+        /* ── HEADER ─────────────────────────────────────── */
+        #appHeader {
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: env(safe-area-inset-top) 16px 0;
+            height: var(--header-h);
+            display: flex;
+            align-items: flex-end;
+            padding-bottom: 12px;
+            flex-shrink: 0;
+            z-index: 30;
+            position: sticky;
+            top: 0;
+        }
+        #appHeader .inner {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #appHeader .title-group { display: flex; flex-direction: column; gap: 1px; }
+        #appHeader h1 { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+        #appHeader .subtitle { font-size: 10px; color: var(--muted); letter-spacing: 0.3px; }
+        #headerBadge {
+            font-size: 11px; font-weight: 700; padding: 3px 8px;
+            border-radius: 6px; background: var(--surface2); color: var(--muted); display: none;
+        }
+        #btnHome {
+            background: none; border: none; color: var(--muted); cursor: pointer;
+            padding: 4px; display: flex; align-items: center; font-size: 20px;
+            transition: color 0.15s;
+        }
+        #btnHome:hover { color: var(--text); }
+
+        /* ── MAIN ───────────────────────────────────────── */
+        #appMain {
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            padding: 0 16px;
+            padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+        }
+        .max-w { max-width: 480px; margin: 0 auto; }
+
+        /* ── VIEWS ──────────────────────────────────────── */
+        .view { display: none; flex-direction: column; min-height: 100%; }
+        .view.active { display: flex; }
+
+        /* ── TOAST ──────────────────────────────────────── */
+        #toast {
+            position: fixed;
+            top: calc(var(--header-h) + 12px);
+            left: 50%; transform: translateX(-50%);
+            background: var(--surface2); color: var(--text);
+            font-size: 13px; font-weight: 500;
+            padding: 10px 18px; border-radius: 12px;
+            border: 1px solid var(--border);
+            z-index: 100; white-space: nowrap;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        #toast.show { opacity: 1; }
+        #toast.error  { border-color: var(--rose);    color: var(--rose); }
+        #toast.success{ border-color: var(--emerald); color: var(--emerald); }
+        #toast.info   { border-color: var(--amber);   color: var(--amber); }
+
+        /* ── CONFIRM MODAL ──────────────────────────────── */
+        #modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.75); z-index: 150;
+            align-items: flex-end; justify-content: center;
+            padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+        }
+        #modal.show { display: flex; }
+        .modal-card {
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 20px; padding: 24px; width: calc(100% - 32px);
+            max-width: 480px; display: flex; flex-direction: column; gap: 16px;
+        }
+        .modal-title { font-size: 17px; font-weight: 700; color: var(--text); }
+        .modal-sub   { font-size: 13px; color: var(--muted); }
+        .modal-actions { display: flex; gap: 10px; }
+        .modal-btn {
+            flex: 1; padding: 14px; border-radius: 12px;
+            font-size: 15px; font-weight: 600; border: none; cursor: pointer;
+        }
+        .modal-btn.cancel { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .modal-btn.confirm { background: var(--rose); color: #fff; }
+        .modal-btn.confirm-em { background: var(--emerald); color: #000; }
+
+        /* ── PASSCODE VIEW ──────────────────────────────── */
+        #view-passcode {
+            justify-content: center; align-items: center;
+            gap: 32px; padding: 32px 0 60px;
+        }
+        .passcode-logo { font-size: 56px; text-align: center; line-height: 1; }
+        .passcode-title { text-align: center; }
+        .passcode-title h2 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+        .passcode-title p  { font-size: 13px; color: var(--muted); }
+        #pinDisplay { display: flex; gap: 12px; justify-content: center; }
+        .pin-dot {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: var(--border); transition: background 0.2s;
+        }
+        .pin-dot.filled { background: var(--emerald); }
+        .pin-dot.error  { background: var(--rose); }
+        .numpad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+        .numpad-btn {
+            height: 72px; border-radius: 50%;
+            background: var(--surface2); border: 1px solid var(--border);
+            color: var(--text); font-size: 22px; font-weight: 600;
+            cursor: pointer; transition: background 0.1s, transform 0.1s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .numpad-btn:active { background: var(--surface); transform: scale(0.93); }
+        .numpad-btn.del   { font-size: 18px; color: var(--muted); }
+        .numpad-btn.empty { visibility: hidden; }
+
+        /* ── DASHBOARD VIEW ─────────────────────────────── */
+        #view-dashboard { padding: 24px 0; gap: 24px; }
+        .dash-header { display: flex; flex-direction: column; gap: 6px; }
+        .dash-header h2 {
+            font-size: 14px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.8px;
+        }
+        .overall-progress { display: flex; flex-direction: column; gap: 8px; }
+        .progress-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+        .progress-label span:last-child { color: var(--emerald); font-weight: 600; }
+        .progress-track { width: 100%; height: 6px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+        .progress-fill  { height: 100%; background: var(--emerald); border-radius: 99px; transition: width 0.5s ease; }
+
+        .quick-actions { display: flex; gap: 10px; }
+        .qa-btn {
+            flex: 1; padding: 14px 8px; border-radius: 14px;
+            border: 1px solid var(--border); background: var(--surface);
+            color: var(--text); font-size: 12px; font-weight: 600;
+            cursor: pointer; transition: border-color 0.15s, background 0.15s;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            text-align: center; line-height: 1.3;
+        }
+        .qa-btn .icon { font-size: 20px; }
+        .qa-btn:hover { border-color: var(--slate); background: var(--surface2); }
+        .qa-btn.emerald { border-color: rgba(16,185,129,0.3); }
+        .qa-btn.emerald:hover { border-color: var(--emerald); }
+        .qa-btn.rose { border-color: rgba(244,63,94,0.3); }
+        .qa-btn.rose:hover { border-color: var(--rose); }
+
+        .sections-label {
+            font-size: 13px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.8px;
+        }
+        .sections-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .section-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 16px; cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .section-card:active { background: var(--surface2); }
+        .section-card.complete {
+            border-color: rgba(16,185,129,0.4);
+            background: rgba(16,185,129,0.05);
+        }
+        .section-card .sec-top { display: flex; justify-content: space-between; align-items: center; }
+        .section-card .sec-num  { font-size: 18px; font-weight: 800; color: var(--text); }
+        .section-card .sec-check{ font-size: 16px; }
+        .section-card .sec-prog { font-size: 12px; font-weight: 600; color: var(--muted); }
+        .section-card.complete .sec-prog { color: var(--emerald); }
+        .sec-mini-bar  { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
+        .sec-mini-fill { height: 100%; background: var(--emerald); border-radius: 99px; transition: width 0.4s; }
+
+        /* ── FLASHCARD VIEW ─────────────────────────────── */
+        #view-flashcard { padding: 16px 0; gap: 16px; align-items: center; }
+        .fc-topbar {
+            width: 100%; max-width: 480px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .fc-cancel-btn {
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 10px; color: var(--muted);
+            padding: 8px 14px; font-size: 14px; font-weight: 500;
+            cursor: pointer; transition: color 0.15s;
+        }
+        .fc-cancel-btn:hover { color: var(--text); }
+        .fc-info { text-align: center; flex: 1; }
+        .fc-info .title   { font-size: 15px; font-weight: 700; color: var(--text); }
+        .fc-info .counter { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .fc-placeholder { width: 68px; }
+
+        /* 3D Card */
+        .card-scene {
+            width: 100%; max-width: 420px;
+            aspect-ratio: 4/3; perspective: 1200px; cursor: pointer;
+        }
+        .card-inner {
+            width: 100%; height: 100%;
+            position: relative; transform-style: preserve-3d;
+            transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-inner.flipped { transform: rotateY(180deg); }
+        .card-face {
+            position: absolute; inset: 0;
+            backface-visibility: hidden; -webkit-backface-visibility: hidden;
+            border-radius: 20px; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; text-align: center;
+        }
+        .card-front { background: var(--surface); border: 1px solid var(--border); }
+        .card-back  {
+            background: var(--surface2);
+            border: 1px solid rgba(16,185,129,0.2);
+            transform: rotateY(180deg);
+        }
+        .card-lang {
+            font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+            text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+        }
+        .card-back .card-lang { color: var(--emerald); opacity: 0.7; }
+        .card-word {
+            font-size: clamp(24px, 8vw, 40px);
+            font-weight: 800; color: var(--text);
+            word-break: break-word; line-height: 1.2;
+        }
+        .card-hint { position: absolute; bottom: 14px; font-size: 11px; color: var(--muted); opacity: 0.6; }
+        .card-audio-btn {
+            position: absolute; top: 14px; right: 14px;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 10px; color: var(--muted);
+            width: 38px; height: 38px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 16px;
+            transition: color 0.15s, border-color 0.15s; z-index: 5;
+        }
+        .card-audio-btn:hover { color: var(--text); border-color: var(--slate); }
+
+        /* Status flash */
+        #statusFlash {
+            font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+            height: 20px; transition: opacity 0.3s; opacity: 0;
+        }
+        #statusFlash.emerald { color: var(--emerald); opacity: 1; }
+        #statusFlash.rose    { color: var(--rose);    opacity: 1; }
+
+        /* Rating buttons */
+        .rating-row {
+            width: 100%; max-width: 420px;
+            display: flex; gap: 16px;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .rate-btn {
+            flex: 1; min-height: 96px; border-radius: 20px; border: 2px solid;
+            background: transparent; font-size: 40px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s, transform 0.1s, border-color 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .rate-btn:active { transform: scale(0.94); }
+        .rate-btn.unlearned { border-color: rgba(244,63,94,0.4); color: var(--rose); }
+        .rate-btn.unlearned:hover { background: rgba(244,63,94,0.1); border-color: var(--rose); }
+        .rate-btn.learned   { border-color: rgba(16,185,129,0.4); color: var(--emerald); }
+        .rate-btn.learned:hover { background: rgba(16,185,129,0.1); border-color: var(--emerald); }
+        .rate-btn:disabled  { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+        /* ── SUMMARY VIEW ───────────────────────────────── */
+        #view-summary {
+            justify-content: center; align-items: center;
+            gap: 24px; padding: 32px 0 60px;
+        }
+        .sum-badge  { font-size: 52px; }
+        .sum-title  { font-size: 24px; font-weight: 800; color: var(--text); text-align: center; }
+        .sum-sub    { font-size: 14px; color: var(--muted); text-align: center; }
+        .sum-stats  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+        .sum-stat   { padding: 20px; border-radius: 16px; text-align: center; }
+        .sum-stat.correct { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); }
+        .sum-stat.wrong   { background: rgba(244,63,94,0.1);  border: 1px solid rgba(244,63,94,0.2); }
+        .sum-stat .sval   { font-size: 40px; font-weight: 800; }
+        .sum-stat.correct .sval { color: var(--emerald); }
+        .sum-stat.wrong   .sval { color: var(--rose); }
+        .sum-stat .slabel {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; color: var(--muted); margin-top: 4px;
+        }
+        .sum-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+        .sum-primary-btn {
+            width: 100%; padding: 16px; border-radius: 14px;
+            background: var(--emerald); color: #000;
+            font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .sum-primary-btn:hover { background: var(--emerald2); }
+        .sum-secondary-btn {
+            width: 100%; padding: 16px; border-radius: 14px;
+            background: var(--surface); color: var(--text);
+            font-size: 15px; font-weight: 600;
+            border: 1px solid var(--border); cursor: pointer;
+            transition: background 0.15s;
+        }
+        .sum-secondary-btn:hover { background: var(--surface2); }
+
+        /* ── LOADING OVERLAY ────────────────────────────── */
+        #loadingOverlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.8); z-index: 200;
+            align-items: center; justify-content: center;
+            flex-direction: column; gap: 14px;
+        }
+        #loadingOverlay.show { display: flex; }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--emerald);
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+        }
+        .loading-msg { font-size: 13px; color: var(--muted); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── SCROLLBAR ──────────────────────────────────── */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+        /* ── SYNC STATUS INDICATOR ──────────────────────── */
+        .sync-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--border); display: inline-block;
+            margin-left: 6px; vertical-align: middle;
+            transition: background 0.4s;
+        }
+        .sync-dot.syncing { background: var(--amber); }
+        .sync-dot.synced  { background: var(--emerald); }
+        .sync-dot.error   { background: var(--rose); }
+    </style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-msg" id="loadingMsg">Loading…</div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="modal">
+    <div class="modal-card">
+        <div>
+            <div class="modal-title" id="modalTitle">Exit session?</div>
+            <div class="modal-sub" id="modalSub">Your progress is saved automatically.</div>
+        </div>
+        <div class="modal-actions">
+            <button class="modal-btn cancel"     id="modalCancel" onclick="App.modalCancel()">Stay</button>
+            <button class="modal-btn confirm"    id="modalConfirm">Exit</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── HEADER ──────────────────────────────────────────────── -->
+<header id="appHeader">
+    <div class="inner">
+        <div class="title-group">
+            <h1>🇩🇪 Flashcard WebAPP by Jen</h1>
+            <span class="subtitle">Optimized for Phones</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span id="headerBadge"></span>
+            <span class="sync-dot" id="syncDot" title="Sync status"></span>
+            <button id="btnHome" onclick="App.handleHomeClick()" title="Home">⌂</button>
+        </div>
+    </div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────────────────── -->
+<main id="appMain">
+
+    <!-- 1. PASSCODE VIEW -->
+    <div id="view-passcode" class="view">
+        <div class="passcode-logo">🇩🇪</div>
+        <div class="passcode-title">
+            <h2>Flashcard WebAPP</h2>
+            <p id="pinPrompt">Enter your 4-digit passcode</p>
+        </div>
+        <div id="pinDisplay">
+            <div class="pin-dot" id="dot0"></div>
+            <div class="pin-dot" id="dot1"></div>
+            <div class="pin-dot" id="dot2"></div>
+            <div class="pin-dot" id="dot3"></div>
+        </div>
+        <div class="numpad">
+            <button class="numpad-btn" onclick="App.pinPress('1')">1</button>
+            <button class="numpad-btn" onclick="App.pinPress('2')">2</button>
+            <button class="numpad-btn" onclick="App.pinPress('3')">3</button>
+            <button class="numpad-btn" onclick="App.pinPress('4')">4</button>
+            <button class="numpad-btn" onclick="App.pinPress('5')">5</button>
+            <button class="numpad-btn" onclick="App.pinPress('6')">6</button>
+            <button class="numpad-btn" onclick="App.pinPress('7')">7</button>
+            <button class="numpad-btn" onclick="App.pinPress('8')">8</button>
+            <button class="numpad-btn" onclick="App.pinPress('9')">9</button>
+            <button class="numpad-btn empty"></button>
+            <button class="numpad-btn" onclick="App.pinPress('0')">0</button>
+            <button class="numpad-btn del" onclick="App.pinDel()">⌫</button>
+        </div>
+    </div>
+
+    <!-- 2. DASHBOARD VIEW -->
+    <div id="view-dashboard" class="view">
+        <div class="max-w" style="display:flex;flex-direction:column;gap:24px;padding:24px 0 40px;">
+
+            <!-- Overall progress bar -->
+            <div class="dash-header">
+                <h2>Your Progress</h2>
+                <div class="overall-progress">
+                    <div class="progress-label">
+                        <span id="dashWordCount">Loading…</span>
+                        <span id="dashPct">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="dashBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick action buttons -->
+            <div class="quick-actions">
+                <button class="qa-btn rose" id="btnUnlearned" onclick="App.startUnlearnedMode()">
+                    <span class="icon">🔁</span>
+                    <span>Review All<br>Unlearned</span>
+                </button>
+                <button class="qa-btn emerald" id="btnReviewAll" onclick="App.startReviewAllMode()">
+                    <span class="icon">📚</span>
+                    <span>Review All<br>Progress</span>
+                </button>
+            </div>
+
+            <!-- Sections grid -->
+            <span class="sections-label">Sections</span>
+            <div class="sections-grid" id="sectionsGrid"></div>
+        </div>
+    </div>
+
+    <!-- 3. FLASHCARD VIEW -->
+    <div id="view-flashcard" class="view" style="align-items:center;">
+        <div class="max-w" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:16px;padding:12px 0 24px;flex:1;">
+
+            <div class="fc-topbar">
+                <button class="fc-cancel-btn" onclick="App.handleHomeClick()">✕ Exit</button>
+                <div class="fc-info">
+                    <div class="title"  id="fcTitle">Section 1</div>
+                    <div class="counter" id="fcCounter">Card 1 / 10</div>
+                </div>
+                <div class="fc-placeholder"></div>
+            </div>
+
+            <div class="card-scene" id="cardScene" onclick="App.flipCard()">
+                <div class="card-inner" id="cardInner">
+                    <!-- Front -->
+                    <div class="card-face card-front">
+                        <button class="card-audio-btn" id="audioFront" onclick="App.playAudio(event,'de')">🔊</button>
+                        <div class="card-lang">Deutsch</div>
+                        <div class="card-word" id="fcWordDe">…</div>
+                        <div class="card-hint">Tap to reveal</div>
+                    </div>
+                    <!-- Back -->
+                    <div class="card-face card-back">
+                        <button class="card-audio-btn" id="audioBack"  onclick="App.playAudio(event,'en')">🔊</button>
+                        <div class="card-lang">English</div>
+                        <div class="card-word" id="fcWordEn">…</div>
+                        <div class="card-hint">Rate to continue</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="statusFlash"></div>
+
+            <div class="rating-row">
+                <button class="rate-btn unlearned" id="btnRateUnlearned" onclick="App.rateCard(0, event)">✕</button>
+                <button class="rate-btn learned"   id="btnRateLearned"   onclick="App.rateCard(1, event)">✔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. SUMMARY VIEW -->
+    <div id="view-summary" class="view">
+        <div class="max-w" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:20px;">
+            <div class="sum-badge" id="sumBadge">🎉</div>
+            <div class="sum-title">Session Complete!</div>
+            <div class="sum-sub" id="sumSub">Here's how you did</div>
+            <div class="sum-stats">
+                <div class="sum-stat correct">
+                    <div class="sval" id="sumCorrect">0</div>
+                    <div class="slabel">Learned ✔</div>
+                </div>
+                <div class="sum-stat wrong">
+                    <div class="sval" id="sumWrong">0</div>
+                    <div class="slabel">Missed ✕</div>
+                </div>
+            </div>
+            <div class="sum-actions">
+                <button class="sum-primary-btn" id="btnRetryUnlearned" onclick="App.retryUnlearned()" style="display:none;">
+                    🔁 Restart Unlearned (<span id="retryCount">0</span>)
+                </button>
+                <button class="sum-secondary-btn" onclick="App.finishSession()">
+                    ✓ End Session
+                </button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  FIREBASE INIT
+// ══════════════════════════════════════════════════════════════════════
+const firebaseConfig = {
+    apiKey: "AIzaSyBkoWZtN1U2Zzf1bskXeDz4OCPw7ksqyeo",
+    authDomain: "flashcard-de.firebaseapp.com",
+    projectId: "flashcard-de",
+    storageBucket: "flashcard-de.firebasestorage.app",
+    messagingSenderId: "527585903618",
+    appId: "1:527585903618:web:9f66398ebb2a999fdf131b",
+    measurementId: "G-C5TPCJGYCQ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ══════════════════════════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════════════════════════
+const PASSCODE            = '6666';
+const WORDS_PER_SECTION   = 10;
+const IDLE_TIMEOUT_MS     = 5 * 60 * 1000; // 5 min
+const DEBOUNCE_MS         = 400;
+
+// ══════════════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════════════
+const State = {
+    // Data
+    vocabulary: {},        // { word_id: { word_id, de, en, section_id } }
+    progress:   {},        // { word_id: { word_id, status } }
+    sections:   [],        // [{ id, wordIds:[], size }]  (0-based)
+
+    // Session
+    sessionMode: '',       // 'section' | 'unlearned' | 'reviewAll'
+    sessionSectionIdx: null,
+    sessionQueue: [],      // shuffled [{word_id,de,en,...}]
+    sessionCardIdx: 0,
+    sessionScore: { correct:0, wrong:0, wrongIds:[] },
+    isFlipped: false,
+
+    // Locks
+    isProcessing: false,
+    _debounceTimers: {},   // { word_id: timerId }
+
+    // Timeouts
+    idleTimer: null,
+    pinBuffer: '',
+
+    // Unsubscribe
+    _unsubVocab: null,
+    _unsubProgress: null,
+};
+
+// ══════════════════════════════════════════════════════════════════════
+//  SMART SECTIONING
+// ══════════════════════════════════════════════════════════════════════
+function buildSections(vocabulary) {
+    const ids = Object.keys(vocabulary)
+        .map(Number)
+        .sort((a, b) => a - b); // sort by word_id
+
+    if (!ids.length) return [];
+
+    const fullCount = Math.floor(ids.length / WORDS_PER_SECTION);
+    const remainder = ids.length % WORDS_PER_SECTION;
+
+    const sections = [];
+    for (let s = 0; s < fullCount; s++) {
+        const start = s * WORDS_PER_SECTION;
+        sections.push({
+            id:      s,
+            wordIds: ids.slice(start, start + WORDS_PER_SECTION),
+        });
+    }
+
+    if (remainder > 0) {
+        if (sections.length === 0) {
+            // only one group, less than 10 words in total
+            sections.push({ id: 0, wordIds: ids });
+        } else {
+            // Merge remainder into last section
+            const last = sections[sections.length - 1];
+            const extStart = fullCount * WORDS_PER_SECTION;
+            last.wordIds = last.wordIds.concat(ids.slice(extStart));
+        }
+    }
+
+    return sections;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  FISHER-YATES SHUFFLE
+// ══════════════════════════════════════════════════════════════════════
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════════════════════════════
+const UI = {
+    views: ['passcode', 'dashboard', 'flashcard', 'summary'],
+
+    show(name) {
+        this.views.forEach(v => {
+            const el = document.getElementById(`view-${v}`);
+            if (el) el.classList.toggle('active', v === name);
+        });
+        const badge   = document.getElementById('headerBadge');
+        const homeBtn = document.getElementById('btnHome');
+        if (name === 'passcode') {
+            badge.style.display   = 'none';
+            homeBtn.style.display = 'none';
+        } else {
+            badge.style.display   = '';
+            badge.textContent     = 'Admin';
+            homeBtn.style.display = '';
+        }
+    },
+
+    toast(msg, type = '', duration = 3000) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = `show${type ? ' ' + type : ''}`;
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.className = '', duration);
+    },
+
+    loading(show, msg = 'Loading…') {
+        document.getElementById('loadingOverlay').classList.toggle('show', show);
+        document.getElementById('loadingMsg').textContent = msg;
+    },
+
+    setSyncDot(status) {
+        // status: 'syncing' | 'synced' | 'error' | ''
+        const dot = document.getElementById('syncDot');
+        dot.className = 'sync-dot' + (status ? ' ' + status : '');
+    },
+
+    setRateDisabled(disabled) {
+        ['btnRateLearned','btnRateUnlearned'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = disabled;
+        });
+        const scene = document.getElementById('cardScene');
+        if (scene) scene.style.pointerEvents = disabled ? 'none' : '';
+    },
+};
+
+// ══════════════════════════════════════════════════════════════════════
+//  FIREBASE LISTENERS
+// ══════════════════════════════════════════════════════════════════════
+function attachListeners() {
+    let initialLoad = true;
+
+    // Vocabulary
+    State._unsubVocab = db.collection('vocabulary').onSnapshot(snap => {
+        if (initialLoad && !snap.empty) {
+            console.log("✅ Database Connected: Loaded " + snap.size + " words");
+            UI.toast('✅ Database Connected', 'success', 3000);
+            initialLoad = false;
+        }
+
+        snap.forEach(doc => {
+            State.vocabulary[doc.id] = doc.data();
+        });
+        // rebuild sections
+        State.sections = buildSections(State.vocabulary);
+        renderDashboard();
+    }, err => {
+        console.error('vocabulary snapshot error', err);
+        UI.toast('⚠️ Firestore error — check connection', 'error', 5000);
+    });
+
+    // User progress
+    State._unsubProgress = db.collection('user_progress').onSnapshot(snap => {
+        snap.forEach(doc => {
+            State.progress[doc.id] = doc.data();
+        });
+        renderDashboard();
+    }, err => {
+        console.error('user_progress snapshot error', err);
+    });
+}
+
+function detachListeners() {
+    if (State._unsubVocab)    { State._unsubVocab();    State._unsubVocab    = null; }
+    if (State._unsubProgress) { State._unsubProgress(); State._unsubProgress = null; }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  FIRESTORE WRITE (debounced)
+// ══════════════════════════════════════════════════════════════════════
+function saveProgress(wordId, status) {
+    UI.setSyncDot('syncing');
+    clearTimeout(State._debounceTimers[wordId]);
+    State._debounceTimers[wordId] = setTimeout(async () => {
+        try {
+            await db.collection('user_progress').doc(String(wordId)).set({
+                word_id: wordId,
+                status:  status,
+            });
+            State.progress[String(wordId)] = { word_id: wordId, status };
+            UI.setSyncDot('synced');
+            setTimeout(() => UI.setSyncDot(''), 1500);
+        } catch (e) {
+            console.error('saveProgress failed', e);
+            UI.setSyncDot('error');
+            UI.toast('Sync failed — will retry', 'error');
+        }
+    }, DEBOUNCE_MS);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  DASHBOARD RENDER
+// ══════════════════════════════════════════════════════════════════════
+function renderDashboard() {
+    const vocab    = State.vocabulary;
+    const progress = State.progress;
+    const sections = State.sections;
+
+    const totalWords   = Object.keys(vocab).length;
+    const learnedWords = Object.values(progress).filter(p => p.status === 1).length;
+    const pct          = totalWords ? Math.round(learnedWords / totalWords * 100) : 0;
+
+    // Overall bar
+    document.getElementById('dashWordCount').textContent =
+        `${learnedWords} / ${totalWords} words learned`;
+    document.getElementById('dashPct').textContent = `${pct}%`;
+    document.getElementById('dashBar').style.width = `${pct}%`;
+
+    // Section cards
+    const grid = document.getElementById('sectionsGrid');
+    grid.innerHTML = '';
+
+    sections.forEach((sec, idx) => {
+        const size    = sec.wordIds.length;
+        const learned = sec.wordIds.filter(id => progress[String(id)]?.status === 1).length;
+        const secPct  = size ? Math.round(learned / size * 100) : 0;
+        const complete= learned >= size && size > 0;
+
+        const card = document.createElement('div');
+        card.className = 'section-card' + (complete ? ' complete' : '');
+        card.innerHTML = `
+            <div class="sec-top">
+                <span class="sec-num">S${idx + 1}</span>
+                <span class="sec-check">${complete ? '✅' : ''}</span>
+            </div>
+            <div class="sec-prog">${learned}/${size} Learned</div>
+            <div class="sec-mini-bar">
+                <div class="sec-mini-fill" style="width:${secPct}%"></div>
+            </div>`;
+        card.addEventListener('click', () => App.startSectionSession(idx));
+        grid.appendChild(card);
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  APP
+// ══════════════════════════════════════════════════════════════════════
+const App = {
+
+    // ── Passcode ───────────────────────────────────────────────────
+    pinPress(digit) {
+        if (State.pinBuffer.length >= 4) return;
+        State.pinBuffer += digit;
+        this._updatePinDots();
+        if (State.pinBuffer.length === 4) {
+            setTimeout(() => this._verifyPin(), 120);
+        }
+    },
+
+    pinDel() {
+        if (!State.pinBuffer.length) return;
+        State.pinBuffer = State.pinBuffer.slice(0, -1);
+        this._updatePinDots();
+    },
+
+    _updatePinDots() {
+        for (let i = 0; i < 4; i++) {
+            document.getElementById(`dot${i}`).className =
+                'pin-dot' + (i < State.pinBuffer.length ? ' filled' : '');
+        }
+    },
+
+    _pinError() {
+        for (let i = 0; i < 4; i++) {
+            document.getElementById(`dot${i}`).className = 'pin-dot error';
+        }
+        State.pinBuffer = '';
+        setTimeout(() => this._updatePinDots(), 700);
+    },
+
+    async _verifyPin() {
+        if (State.pinBuffer !== PASSCODE) {
+            this._pinError();
+            UI.toast('Wrong passcode', 'error');
+            return;
+        }
+        State.pinBuffer = '';
+        this._updatePinDots();
+
+        // Attach Firestore listeners on first login
+        if (!State._unsubVocab) {
+            UI.loading(true, 'Connecting to Firebase…');
+            attachListeners();
+            // Give Firestore a moment to deliver first snapshot
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            UI.loading(false);
+        }
+
+        this._resetIdleTimer();
+        UI.show('dashboard');
+        renderDashboard();
+    },
+
+    // ── Idle timeout ───────────────────────────────────────────────
+    _resetIdleTimer() {
+        clearTimeout(State.idleTimer);
+        State.idleTimer = setTimeout(() => {
+            // Save any pending writes, then force re-auth
+            UI.toast('Session expired — please re-enter passcode', 'info', 4000);
+            UI.show('passcode');
+            document.getElementById('pinPrompt').textContent = 'Session expired. Re-enter passcode';
+        }, IDLE_TIMEOUT_MS);
+    },
+
+    _touchActivity() {
+        if (document.getElementById('view-passcode').classList.contains('active')) return;
+        this._resetIdleTimer();
+    },
+
+    // ── Home / Exit ────────────────────────────────────────────────
+    handleHomeClick() {
+        const inFlashcard = document.getElementById('view-flashcard').classList.contains('active');
+        if (inFlashcard) {
+            App.showModal(
+                'Exit session?',
+                'Your progress is saved automatically.',
+                'Stay',
+                'Exit',
+                () => { UI.show('dashboard'); renderDashboard(); },
+                true
+            );
+        } else {
+            UI.show('dashboard');
+            renderDashboard();
+        }
+    },
+
+    // ── Modal ──────────────────────────────────────────────────────
+    showModal(title, sub, cancelLabel, confirmLabel, onConfirm, isDanger = false) {
+        document.getElementById('modalTitle').textContent   = title;
+        document.getElementById('modalSub').textContent     = sub;
+        document.getElementById('modalCancel').textContent  = cancelLabel;
+        const confirmBtn = document.getElementById('modalConfirm');
+        confirmBtn.textContent = confirmLabel;
+        confirmBtn.className   = 'modal-btn ' + (isDanger ? 'confirm' : 'confirm-em');
+        confirmBtn.onclick     = () => { document.getElementById('modal').classList.remove('show'); onConfirm(); };
+        document.getElementById('modal').classList.add('show');
+    },
+
+    modalCancel() {
+        document.getElementById('modal').classList.remove('show');
+    },
+
+    // ── Session starters ───────────────────────────────────────────
+    startSectionSession(sectionIdx) {
+        const sec   = State.sections[sectionIdx];
+        if (!sec || !sec.wordIds.length) { UI.toast('No words in this section', 'error'); return; }
+        State.sessionMode       = 'section';
+        State.sessionSectionIdx = sectionIdx;
+        const words = sec.wordIds.map(id => State.vocabulary[String(id)]).filter(Boolean);
+        this._beginSession(words, `Section ${sectionIdx + 1}`);
+    },
+
+    startUnlearnedMode() {
+        const unlearned = Object.values(State.vocabulary).filter(w => {
+            const p = State.progress[String(w.word_id)];
+            return !p || p.status !== 1;
+        });
+        if (!unlearned.length) { UI.toast('🎉 All words learned!', 'success'); return; }
+        State.sessionMode = 'unlearned';
+        this._beginSession(unlearned, `All Unlearned (${unlearned.length})`);
+    },
+
+    startReviewAllMode() {
+        const all = Object.values(State.vocabulary);
+        if (!all.length) { UI.toast('No words loaded yet', 'error'); return; }
+        State.sessionMode = 'reviewAll';
+        this._beginSession(all, `Review All (${all.length})`);
+    },
+
+    _beginSession(words, title) {
+        if (!words.length) { UI.toast('No words to study!', 'error'); return; }
+        State.sessionQueue   = shuffle(words);
+        State.sessionCardIdx = 0;
+        State.sessionScore   = { correct: 0, wrong: 0, wrongIds: [] };
+        State.isFlipped      = false;
+        State.isProcessing   = false;
+        document.getElementById('fcTitle').textContent = title;
+        UI.show('flashcard');
+        this._renderCard();
+        this._resetIdleTimer();
+    },
+
+    // ── Card rendering ─────────────────────────────────────────────
+    _renderCard() {
+        const word    = State.sessionQueue[State.sessionCardIdx];
+        const total   = State.sessionQueue.length;
+        const current = State.sessionCardIdx + 1;
+
+        document.getElementById('fcWordDe').textContent = word.de;
+        document.getElementById('fcWordEn').textContent = word.en;
+        document.getElementById('fcCounter').textContent = `Card ${current} / ${total}`;
+
+        // Reset flip
+        const inner = document.getElementById('cardInner');
+        inner.classList.remove('flipped');
+        State.isFlipped  = false;
+        State.isProcessing = false;
+
+        // Status flash reset
+        const sf = document.getElementById('statusFlash');
+        sf.className = '';
+        sf.textContent = '';
+
+        UI.setRateDisabled(false);
+    },
+
+    flipCard() {
+        const inner = document.getElementById('cardInner');
+        inner.classList.toggle('flipped');
+        State.isFlipped = !State.isFlipped;
+    },
+
+    // ── Rating ─────────────────────────────────────────────────────
+    rateCard(status, event) {
+        if (event) event.stopPropagation();
+        if (State.isProcessing) return;
+        State.isProcessing = true;
+        UI.setRateDisabled(true);
+
+        const word = State.sessionQueue[State.sessionCardIdx];
+
+        // Session score
+        if (status === 1) {
+            State.sessionScore.correct++;
+        } else {
+            State.sessionScore.wrong++;
+            State.sessionScore.wrongIds.push(word.word_id);
+        }
+
+        // Flash feedback
+        const sf = document.getElementById('statusFlash');
+        if (status === 1) {
+            sf.textContent = '— LEARNED —';
+            sf.className   = 'emerald';
+        } else {
+            sf.textContent = '— MISSED —';
+            sf.className   = 'rose';
+        }
+
+        // Save to Firestore (debounced)
+        saveProgress(word.word_id, status);
+
+        // Advance after brief pause
+        setTimeout(() => {
+            State.sessionCardIdx++;
+            if (State.sessionCardIdx < State.sessionQueue.length) {
+                this._renderCard();
+            } else {
+                this._showSummary();
+            }
+            this._resetIdleTimer();
+        }, 350);
+    },
+
+    // ── Audio ──────────────────────────────────────────────────────
+    playAudio(event, lang) {
+        event.stopPropagation();
+        const word  = State.sessionQueue[State.sessionCardIdx];
+        if (!word) return;
+        const text  = lang === 'de' ? word.de : word.en;
+        const langCode = lang === 'de' ? 'de-DE' : 'en-US';
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang  = langCode;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+    },
+
+    // ── Summary ────────────────────────────────────────────────────
+    _showSummary() {
+        const { correct, wrong, wrongIds } = State.sessionScore;
+        const total = correct + wrong;
+
+        document.getElementById('sumCorrect').textContent = correct;
+        document.getElementById('sumWrong').textContent   = wrong;
+        document.getElementById('sumBadge').textContent   = wrong === 0 ? '🏆' : correct > wrong ? '🎉' : '📖';
+        document.getElementById('sumSub').textContent     =
+            wrong === 0 ? 'Perfect round!' : `${correct} / ${total} correct this session`;
+
+        const retryBtn = document.getElementById('btnRetryUnlearned');
+        if (wrongIds.length > 0) {
+            document.getElementById('retryCount').textContent = wrongIds.length;
+            retryBtn.style.display = '';
+        } else {
+            retryBtn.style.display = 'none';
+        }
+
+        UI.show('summary');
+    },
+
+    retryUnlearned() {
+        const wrongIds = State.sessionScore.wrongIds;
+        if (!wrongIds.length) return;
+        const words = wrongIds.map(id => State.vocabulary[String(id)]).filter(Boolean);
+        this._beginSession(words, `Retry (${words.length} missed)`);
+    },
+
+    finishSession() {
+        UI.show('dashboard');
+        renderDashboard();
+        this._resetIdleTimer();
+    },
+};
+
+// ══════════════════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════════════════
+(function init() {
+    UI.show('passcode');
+
+    // Global idle/activity detection
+    document.addEventListener('touchstart',  () => App._touchActivity(), { passive: true });
+    document.addEventListener('click',       () => App._touchActivity(), { passive: true });
+
+    // Reset pin prompt if revisiting passcode view
+    document.getElementById('pinPrompt').textContent = 'Enter your 4-digit passcode';
+})();
+</script>
+</body>
+</html>

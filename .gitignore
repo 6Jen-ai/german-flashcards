@@ -1,0 +1,15 @@
+# ── Firebase Secrets ──────────────────────────────────────
+serviceAccountKey*
+*.json.json
+
+# ── All JSON files (credentials, configs) ─────────────────
+*.json
+
+# ── Node.js Dependencies ───────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── OS Junk ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
